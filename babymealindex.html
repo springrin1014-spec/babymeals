@@ -642,11 +642,7 @@ function renderDayMeals(idx) {
           ${(m.nutrition||[]).map(n=>`<span class="meal-tag tag-nutrition">${n}</span>`).join('')}
         </div>
       </div>
-      <button class="recipe-btn" id="rbtn-${idx}-${meal}" 
-        data-day="${idx}" data-meal="${meal}" 
-        data-name="${(m.name||'').replace(/"/g, '&quot;')}" 
-        data-time="${m.time||''}"
-        onclick="toggleRecipe(this)">
+      <button class="recipe-btn" id="rbtn-${idx}-${meal}" data-day="${idx}" data-meal="${meal}" data-time="${m.time||''}" onclick="toggleRecipe(this)">
         📖 레시피 보기 ▾
       </button>
       <div class="recipe-content" id="recipe-${idx}-${meal}"></div>
@@ -658,8 +654,10 @@ function renderDayMeals(idx) {
 async function toggleRecipe(btnEl) {
   const dayIdx = parseInt(btnEl.dataset.day);
   const meal = btnEl.dataset.meal;
-  const menuName = btnEl.dataset.name;
   const time = btnEl.dataset.time;
+  // 메뉴 이름을 카드에서 직접 읽기
+  const card = document.getElementById(`mc-${dayIdx}-${mealType}`);
+  const menuName = card ? card.querySelector('.meal-name')?.textContent || '' : '';
   const btn = document.getElementById(`rbtn-${dayIdx}-${meal}`);
   const box = document.getElementById(`recipe-${dayIdx}-${meal}`);
   if (!btn || !box) return;

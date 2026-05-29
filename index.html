@@ -647,11 +647,10 @@ function renderDayMeals(idx) {
   }).join('');
 
   // 레시피 버튼 JS로 추가 (template literal 밖에서)
-  if (!isNursery) {
-    MEALS.forEach(function(meal) {
-      const wrap = document.getElementById('recipe-wrap-' + idx + '-' + meal);
-      const m = day.meals[meal];
-      if (wrap && m && m.name && m.name !== 'nursery') {
+  MEALS.forEach(function(meal) {
+    const wrap = document.getElementById('recipe-wrap-' + idx + '-' + meal);
+    const m = day.meals[meal];
+    if (wrap && m && m.name && m.name !== 'nursery') {
         const btn = document.createElement('button');
         btn.className = 'recipe-btn';
         btn.id = 'rbtn-' + idx + '-' + meal;
@@ -665,8 +664,7 @@ function renderDayMeals(idx) {
         wrap.appendChild(btn);
         wrap.appendChild(recipeDiv);
       }
-    });
-  }
+  });
 }
 
 // ━━━ 레시피 보기 ━━━

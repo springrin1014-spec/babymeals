@@ -642,10 +642,31 @@ function renderDayMeals(idx) {
           ${(m.nutrition||[]).map(n=>`<span class="meal-tag tag-nutrition">${n}</span>`).join('')}
         </div>
       </div>
-      <button class="recipe-btn" id="rbtn-${idx}-${meal}" data-day="${idx}" data-meal="${meal}" onclick="toggleRecipe(this)">📖 레시피 보기 ▾</button>
-      <div class="recipe-content" id="recipe-${idx}-${meal}"></div>
+      <div id="recipe-wrap-${idx}-${meal}"></div>
     </div>`;
   }).join('');
+
+  // 레시피 버튼 JS로 추가 (template literal 밖에서)
+  if (!isNursery) {
+    MEALS.forEach(function(meal) {
+      const wrap = document.getElementById('recipe-wrap-' + idx + '-' + meal);
+      const m = day.meals[meal];
+      if (wrap && m && m.name && m.name !== 'nursery') {
+        const btn = document.createElement('button');
+        btn.className = 'recipe-btn';
+        btn.id = 'rbtn-' + idx + '-' + meal;
+        btn.dataset.day = idx;
+        btn.dataset.meal = meal;
+        btn.textContent = '📖 레시피 보기 ▾';
+        btn.onclick = function() { toggleRecipe(this); };
+        const recipeDiv = document.createElement('div');
+        recipeDiv.className = 'recipe-content';
+        recipeDiv.id = 'recipe-' + idx + '-' + meal;
+        wrap.appendChild(btn);
+        wrap.appendChild(recipeDiv);
+      }
+    });
+  }
 }
 
 // ━━━ 레시피 보기 ━━━

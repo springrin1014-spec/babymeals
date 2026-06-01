@@ -265,6 +265,19 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
         <span class="nd">점심·간식 제공</span>
       </div>
     </div>
+    <div id="holidayWrap" style="margin-top:14px;display:none;">
+      <div class="card-label" style="margin-bottom:8px;">이번 주 휴무일 (선택)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;" id="holidayBtns">
+        <button class="allergy-chip" id="hd-mon" onclick="toggleHoliday(this,&#39;월&#39;)">월요일</button>
+        <button class="allergy-chip" id="hd-tue" onclick="toggleHoliday(this,&#39;화&#39;)">화요일</button>
+        <button class="allergy-chip" id="hd-wed" onclick="toggleHoliday(this,&#39;수&#39;)">수요일</button>
+        <button class="allergy-chip" id="hd-thu" onclick="toggleHoliday(this,&#39;목&#39;)">목요일</button>
+        <button class="allergy-chip" id="hd-fri" onclick="toggleHoliday(this,&#39;금&#39;)">금요일</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:7px;">
+        🏖️ 선택한 날은 모든 끼니를 집에서 먹는 날로 설정돼요
+      </div>
+    </div>
     <div id="nurseryPhotoWrap" style="margin-top:14px;">
       <div class="card-label" style="margin-bottom:10px;">이번 주 급식표 사진 (선택)</div>
       <div class="photo-upload-area" id="photoArea" onclick="document.getElementById(&#39;photoInput&#39;).click()">
@@ -397,6 +410,18 @@ function selNursery(mode) {
   document.getElementById('nb-nursery').classList.toggle('active',mode==='nursery');
   document.getElementById('nb-elementary').classList.toggle('active',mode==='elementary');
   document.getElementById('nurseryPhotoWrap').style.display=(mode==='nursery'||mode==='elementary')?'block':'none';
+  document.getElementById('holidayWrap').style.display=(mode==='nursery'||mode==='elementary')?'block':'none';
+}
+
+let holidays = new Set();
+function toggleHoliday(el, day) {
+  if (holidays.has(day)) {
+    holidays.delete(day);
+    el.classList.remove('checked');
+  } else {
+    holidays.add(day);
+    el.classList.add('checked');
+  }
 }
 
 function selTheme(el,theme) {
@@ -513,7 +538,10 @@ async function generatePlan() {
   const nurseryMealText = Object.keys(nurseryMeals).length ? `급식표(저녁 중복 금지): ${JSON.stringify(nurseryMeals)}` : '';
   const seasonText = seasonIngredients.length ? `제철재료 우선: ${seasonIngredients.join(',')}` : '';
 
-  const baseCondition = `나이:${selectedAge} ${allergyText} ${nurseryText} ${nurseryMealText} ${seasonText} ${fridgeText} tip은 10자이내`;
+  const holidayText = holidays.size > 0 
+    ? `휴무일(${[...holidays].join(',')}):해당 요일은 점심/간식 포함 전체 끼니 생성 필요` 
+    : '';
+  const baseCondition = `나이:${selectedAge} ${allergyText} ${nurseryText} ${holidayText} ${nurseryMealText} ${seasonText} ${fridgeText} tip은 10자이내`;
 
   const makePrompt = (days) => `${selectedAge} 아이를 위한 전문 영양사. ${days} 식단을 JSON으로 만들어줘.
 
@@ -571,7 +599,7 @@ JSON만 출력(다른 텍스트 없이):
 
     // 쇼핑리스트는 별도 요청
     const shoppingText = await callAI(`${selectedAge} 아이 일주일 식단 재료 장보기 리스트 JSON만 출력:
-{"shoppingList":{"채소·과일":[{"item":"당근","amount":"2개","days":["월"]}],"단백질":[{"item":"닭가슴살","amount":"300g","days":["월"]}],"유제품·달걀":[{"item":"달걀","amount":"6개","days":["월"]}],"양념·기타":[{"item":"간장","amount":"1병","days":["월"]}]},"nutrition":{"단백질":{"pct":85,"tip":""},"채소":{"pct":70,"tip":""},"칼슘":{"pct":60,"tip":""},"철분":{"pct":78,"tip":""},"탄수화물":{"pct":90,"tip":""}}}
+{"shoppingList":{"채소·과일":[{"item":"당근","amount":"2개","days":["월"]}],"단백질":[{"item":"닭가슴살","amount":"300g","days":["월"]}],"유제품·달걀":[{"item":"달걀","amount":"6개","days":["월"]}],"곡물·탄수화물":[{"item":"식빵","amount":"1봉","days":["월"]}]},"nutrition":{"단백질":{"pct":85,"tip":""},"채소":{"pct":70,"tip":""},"칼슘":{"pct":60,"tip":""},"철분":{"pct":78,"tip":""},"탄수화물":{"pct":90,"tip":""}}}
 나이:${selectedAge} ${allergyText}. 실제 재료 10~15가지로 채워줘.`);
 
     let shopping = { shoppingList: {}, nutrition: {} };
@@ -859,7 +887,7 @@ function renderNutrition() {
 function renderShopping() {
   if (!weekPlan?.shoppingList) return;
   const sl = weekPlan.shoppingList;
-  const ICONS = {'채소·과일':'🥦','단백질':'🍗','유제품·달걀':'🥚','양념·기타':'🧂'};
+  const ICONS = {'채소·과일':'🥦','단백질':'🍗','유제품·달걀':'🥚','곡물·탄수화물':'🍞'};
 
   document.getElementById('shoppingContent').innerHTML = `
     ${seasonIngredients.length?`
@@ -879,6 +907,12 @@ function renderShopping() {
             </div>`).join('')}
         </div>
       </div>`).join('')}`;
+
+  // 장보기 안내 문구 추가
+  const noticeEl = document.createElement('div');
+  noticeEl.style.cssText = 'margin-top:16px;padding:12px 14px;background:var(--yellow-light,#FEF3C7);border:1px solid #F59E0B;border-radius:12px;font-size:12px;color:#92400E;line-height:1.7;';
+  noticeEl.innerHTML = '⚠️ AI가 생성한 장보기 목록이에요.<br>식단에 따라 <strong>일부 재료가 누락될 수 있으니</strong> 조리 전 레시피를 꼭 확인해주세요.';
+  document.getElementById('shoppingContent').appendChild(noticeEl);
 
   // 체크 상태 복원
   checkedItems.forEach(item=>{

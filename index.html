@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>아이밥상 — 일주일 식단표</title>
+<title>엄마의 밥상 — 일주일 식단표</title>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -149,6 +149,8 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
 .shopping-title{font-family:'Nanum Myeongjo',serif;font-size:19px;font-weight:800;color:var(--brown);}
 .shop-btn-group{display:flex;gap:7px;}
 .coupang-btn{background:#E53E3E;color:var(--white);border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Pretendard',sans-serif;transition:all 0.2s;}
+.coupang-full-btn{display:block;width:100%;background:#E53E3E;color:var(--white);border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Pretendard',sans-serif;transition:all 0.2s;margin-bottom:16px;text-align:center;box-shadow:0 4px 14px rgba(229,62,62,0.3);}
+.coupang-full-btn:hover{background:#C53030;transform:translateY(-1px);}
 .coupang-btn:hover{background:#C53030;transform:translateY(-1px);}
 .kurly-btn{background:#5A2D82;color:var(--white);border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Pretendard',sans-serif;transition:all 0.2s;}
 .kurly-btn:hover{background:#4A2070;transform:translateY(-1px);}
@@ -199,7 +201,7 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
 <!-- 아이 정보 -->
 <div class="panel active" id="panel-profile">
   <div class="page-header">
-    <h1>🍽️ 아이<span>밥상</span></h1>
+    <h1>🍽️ 엄마의 <span>밥상</span></h1>
     <p>일주일 식단을 AI가 짜드려요<br>영양·편의·제철 재료까지 한번에 🥕</p>
   </div>
 
@@ -280,7 +282,7 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
     <p class="loading-text" id="loadingText">영양 균형 계산 중이에요...</p>
   </div>
   <div class="error-wrap" id="errorBox"><p id="errorMsg"></p></div>
-  <div class="footer">🍽️ 아이밥상 · Powered by Google Gemini AI</div>
+  <div class="footer">🍽️ 엄마의 밥상 · momsbapsang</div>
 </div>
 
 <!-- 식단표 -->
@@ -312,11 +314,8 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div style="padding-top:16px;">
     <div class="shopping-header">
       <div class="shopping-title">🛒 장보기 리스트</div>
-      <div class="shop-btn-group">
-        <button class="coupang-btn" onclick="openCoupang()">🛍 쿠팡에서 장보기</button>
-        
-      </div>
     </div>
+    <button class="coupang-full-btn" onclick="openCoupang()">🛍 쿠팡에서 한번에 장보기</button>
     <div id="shoppingContent">
       <div class="empty-state"><span class="empty-state-emoji">🛒</span><p>식단표를 먼저 생성해주세요!</p></div>
     </div>
@@ -336,8 +335,8 @@ let checkedItems = new Set();
 let photoBase64 = null;
 let photoMimeType = null;
 
-const MEALS = ['아침','점심','저녁','간식'];
-const MEAL_COLORS = {아침:'dt-breakfast',점심:'dt-lunch',저녁:'dt-dinner',간식:'dt-snack'};
+const MEALS = ['아침','점심','간식','저녁'];
+const MEAL_COLORS = {아침:'dt-breakfast',점심:'dt-lunch',간식:'dt-snack',저녁:'dt-dinner'};
 const SEASON_INGREDIENTS = {
   3:['봄나물','딸기','냉이'],4:['딸기','아스파라거스','쑥'],
   5:['완두콩','감자','오이'],6:['수박','옥수수','토마토'],
@@ -841,7 +840,7 @@ function renderShopping() {
               <div class="shopping-check">✓</div>
               <div class="shopping-name">${item.item}</div>
               <div class="shopping-amount">${item.amount||''}</div>
-              <a class="shop-link" href="https://www.coupang.com/np/search?q=${encodeURIComponent(item.item)}" target="_blank" onclick="event.stopPropagation()">쿠팡↗</a>
+
             </div>`).join('')}
         </div>
       </div>`).join('')}`;

@@ -222,14 +222,14 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div class="card">
     <div class="card-label">알레르기 / 제한 식품</div>
     <div class="allergy-wrap">
-      <label class="allergy-chip"><input type="checkbox" value="계란"> 🥚 계란</label>
-      <label class="allergy-chip"><input type="checkbox" value="우유·유제품"> 🥛 우유</label>
-      <label class="allergy-chip"><input type="checkbox" value="밀·글루텐"> 🌾 밀</label>
-      <label class="allergy-chip"><input type="checkbox" value="땅콩"> 🥜 땅콩</label>
-      <label class="allergy-chip"><input type="checkbox" value="견과류"> 🌰 견과류</label>
-      <label class="allergy-chip"><input type="checkbox" value="새우·게"> 🦐 새우/게</label>
-      <label class="allergy-chip"><input type="checkbox" value="생선"> 🐟 생선</label>
-      <label class="allergy-chip"><input type="checkbox" value="콩·두부"> 🫘 콩/두부</label>
+      <button type="button" class="allergy-chip" data-value="계란" onclick="toggleAllergy(this)">🥚 계란</button>
+      <button type="button" class="allergy-chip" data-value="우유·유제품" onclick="toggleAllergy(this)">🥛 우유</button>
+      <button type="button" class="allergy-chip" data-value="밀·글루텐" onclick="toggleAllergy(this)">🌾 밀</button>
+      <button type="button" class="allergy-chip" data-value="땅콩" onclick="toggleAllergy(this)">🥜 땅콩</button>
+      <button type="button" class="allergy-chip" data-value="견과류" onclick="toggleAllergy(this)">🌰 견과류</button>
+      <button type="button" class="allergy-chip" data-value="새우·게" onclick="toggleAllergy(this)">🦐 새우/게</button>
+      <button type="button" class="allergy-chip" data-value="생선" onclick="toggleAllergy(this)">🐟 생선</button>
+      <button type="button" class="allergy-chip" data-value="콩·두부" onclick="toggleAllergy(this)">🫘 콩/두부</button>
     </div>
   </div>
 
@@ -431,13 +431,15 @@ function selTheme(el,theme) {
 
 function getAllergies() {
   const r=[];
-  document.querySelectorAll('.allergy-chip.checked input').forEach(i=>r.push(i.value));
+  document.querySelectorAll('.allergy-chip.checked').forEach(btn=>{
+    if(btn.dataset.value) r.push(btn.dataset.value);
+  });
   return r;
 }
 
-document.querySelectorAll('.allergy-chip').forEach(chip=>{
-  chip.addEventListener('click',function(){this.classList.toggle('checked');});
-});
+function toggleAllergy(btn) {
+  btn.classList.toggle('checked');
+}
 
 // ━━━ 급식표 사진 분석 ━━━
 async function handlePhoto(event) {

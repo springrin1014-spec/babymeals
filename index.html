@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>엄마의 밥상 — 일주일 식단표</title>
+<!-- Google Analytics GA4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+  // 커스텀 이벤트 추적 함수
+  function trackEvent(action, category, label) {
+    gtag('event', action, {event_category: category, event_label: label});
+  }
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -182,6 +194,18 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
 .empty-state-emoji{font-size:44px;display:block;margin-bottom:14px;}
 
 .footer{text-align:center;padding:18px 0 0;font-size:11px;color:var(--muted);opacity:0.5;}
+.child-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.child-tab{flex:1;padding:10px;border:2px solid var(--border);border-radius:12px;background:var(--warm);cursor:pointer;text-align:center;font-size:13px;font-weight:600;color:var(--muted);font-family:'Pretendard',sans-serif;transition:all 0.2s;}
+.child-tab.active{border-color:var(--peach-deep);background:var(--white);color:var(--brown);}
+.child-tab .child-name{font-size:15px;margin-bottom:2px;}
+.child-tab .child-info{font-size:11px;opacity:0.7;}
+.add-child-btn{width:100%;border:2px dashed var(--border);border-radius:12px;padding:12px;background:transparent;color:var(--muted);font-size:13px;cursor:pointer;font-family:'Pretendard',sans-serif;transition:all 0.2s;margin-bottom:8px;}
+.add-child-btn:hover{border-color:var(--peach);color:var(--peach-deep);}
+.fav-btn{background:none;border:none;font-size:18px;cursor:pointer;padding:4px;transition:transform 0.2s;line-height:1;}
+.fav-btn:hover{transform:scale(1.2);}
+.fav-btn.active{color:#FFD700;}
+.saved-badge{background:var(--green-light);color:var(--green);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;display:none;align-items:center;gap:6px;}
+.saved-badge.show{display:flex;}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-10px)}}
@@ -203,6 +227,23 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div class="page-header">
     <h1>🍽️ 엄마의 <span>밥상</span></h1>
     <p>일주일 식단을 AI가 짜드려요<br>영양·편의·제철 재료까지 한번에 🥕</p>
+  </div>
+
+  <div class="card">
+    <div class="card-label">우리 아이 프로필</div>
+    <div class="child-tabs" id="childTabs">
+      <div class="child-tab active" id="childTab0" onclick="switchChild(0)">
+        <div class="child-name">👶 첫째</div>
+        <div class="child-info" id="childInfo0">12~18개월</div>
+      </div>
+    </div>
+    <button class="add-child-btn" id="addChildBtn" onclick="addChild()">
+      + 둘째 추가하기
+    </button>
+    <div id="childProfiles">
+      <div id="profile0" class="child-profile-section"></div>
+      <div id="profile1" class="child-profile-section" style="display:none;"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -309,7 +350,14 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div style="padding-top:16px;">
     <div class="week-header">
       <div class="week-title" id="weekTitle">이번 주 식단표</div>
-      <button class="regen-btn" onclick="generatePlan()">↺ 다시 짜기</button>
+      <div style="display:flex;gap:6px;">
+        <button class="regen-btn" onclick="savePlan()">💾 저장</button>
+        <button class="regen-btn" onclick="showSavedPlans()">📅 불러오기</button>
+        <button class="regen-btn" onclick="generatePlan()">↺ 다시 짜기</button>
+      </div>
+    </div>
+    <div class="saved-badge" id="savedBadge">
+      ✅ 이번 주 식단이 저장됐어요! <button onclick="showFavorites()" style="background:none;border:none;color:var(--green);font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;font-size:12px;">⭐ 즐겨찾기 보기</button>
     </div>
     <div class="day-tabs" id="dayTabs"></div>
     <div id="leftoverAlert" style="display:none;"></div>
@@ -343,6 +391,13 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
 
 <script>
 // ━━━ 상태 ━━━
+// ━━━ 다중 프로필 상태 ━━━
+let children = [
+  { age: '12~18개월', allergies: [], nurseryMode: 'nursery', name: '첫째' }
+];
+let activeChild = 0;
+
+// 기존 변수 (하위호환)
 let selectedAge = '12~18개월';
 let nurseryMode = 'nursery';
 let selectedTheme = '골고루 균형잡힌';
@@ -351,6 +406,11 @@ let weekPlan = null;
 let currentDay = 0;
 let loadingInterval = null;
 let checkedItems = new Set();
+// ━━━ 즐겨찾기 상태 ━━━
+let favorites = JSON.parse(localStorage.getItem('mb_favorites') || '{}');
+
+// ━━━ 저장된 식단 ━━━
+let savedPlans = JSON.parse(localStorage.getItem('mb_savedPlans') || '[]');
 let photoBase64 = null;
 let photoMimeType = null;
 
@@ -397,6 +457,123 @@ function showToast(msg) {
   const el=document.getElementById('toast');
   el.textContent=msg; el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+// ━━━ 형제 프로필 관리 ━━━
+function switchChild(idx) {
+  // 현재 아이 상태 저장
+  children[activeChild].age = selectedAge;
+  children[activeChild].nurseryMode = nurseryMode;
+  
+  // 탭 전환
+  activeChild = idx;
+  document.querySelectorAll('.child-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  
+  // 해당 아이 상태 불러오기
+  selectedAge = children[idx].age;
+  nurseryMode = children[idx].nurseryMode;
+  
+  // UI 업데이트
+  document.querySelectorAll('.age-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().includes(selectedAge.slice(0,3)));
+  });
+  selNursery(nurseryMode);
+  
+  // 프로필 섹션 전환
+  document.querySelectorAll('.child-profile-section').forEach((s,i) => {
+    s.style.display = i === idx ? 'block' : 'none';
+  });
+}
+
+function addChild() {
+  if (children.length >= 2) {
+    showToast('아이 프로필은 최대 2개까지 추가할 수 있어요!'); return;
+  }
+  children.push({ age: '4~5세', allergies: [], nurseryMode: 'none', name: '둘째' });
+  
+  // 탭 추가
+  const tabs = document.getElementById('childTabs');
+  const newTab = document.createElement('div');
+  newTab.className = 'child-tab';
+  newTab.id = 'childTab1';
+  newTab.onclick = () => switchChild(1);
+  newTab.innerHTML = '<div class="child-name">👧 둘째</div><div class="child-info" id="childInfo1">4~5세</div>';
+  tabs.appendChild(newTab);
+  
+  // 추가 버튼 숨기기
+  document.getElementById('addChildBtn').style.display = 'none';
+  
+  switchChild(1);
+  showToast('✅ 둘째 프로필이 추가됐어요!');
+  trackEvent('add_child', 'profile', '둘째 추가');
+}
+
+// ━━━ 즐겨찾기 관리 ━━━
+function toggleFavorite(dayIdx, meal, menuName) {
+  const key = `${dayIdx}-${meal}`;
+  if (favorites[key]) {
+    delete favorites[key];
+    showToast('즐겨찾기에서 제거했어요');
+  } else {
+    favorites[key] = { menuName, meal, savedAt: new Date().toLocaleDateString() };
+    showToast('⭐ 즐겨찾기에 저장했어요!');
+    trackEvent('favorite_recipe', 'recipe', menuName);
+  }
+  localStorage.setItem('mb_favorites', JSON.stringify(favorites));
+  
+  // 버튼 상태 업데이트
+  const btn = document.getElementById(`fav-${dayIdx}-${meal}`);
+  if (btn) btn.classList.toggle('active', !!favorites[key]);
+}
+
+function showFavorites() {
+  const keys = Object.keys(favorites);
+  if (!keys.length) { showToast('저장된 즐겨찾기가 없어요!'); return; }
+  
+  const list = keys.map(k => `• ${favorites[k].menuName} (${favorites[k].meal})`).join('\n');
+  alert(`⭐ 즐겨찾기 목록\n\n${list}`);
+}
+
+// ━━━ 식단 저장 ━━━
+function savePlan() {
+  if (!weekPlan) { showToast('식단표를 먼저 생성해주세요!'); return; }
+  
+  const saved = {
+    date: new Date().toLocaleDateString(),
+    plan: weekPlan,
+    childAge: selectedAge
+  };
+  
+  savedPlans.unshift(saved);
+  if (savedPlans.length > 4) savedPlans = savedPlans.slice(0, 4); // 최근 4주만
+  localStorage.setItem('mb_savedPlans', JSON.stringify(savedPlans));
+  
+  showToast('📅 이번 주 식단을 저장했어요!');
+  document.getElementById('savedBadge').classList.add('show');
+  trackEvent('save_plan', 'plan', selectedAge);
+}
+
+function loadSavedPlan(idx) {
+  if (!savedPlans[idx]) return;
+  weekPlan = savedPlans[idx].plan;
+  renderCalendar();
+  renderNutrition();
+  renderShopping();
+  showTab('plan');
+  showToast(`📅 ${savedPlans[idx].date} 식단을 불러왔어요!`);
+}
+
+function showSavedPlans() {
+  if (!savedPlans.length) { showToast('저장된 식단이 없어요!'); return; }
+  
+  const list = savedPlans.map((p, i) => 
+    `${i+1}. ${p.date} (${p.childAge})`
+  ).join('\n');
+  
+  const choice = prompt(`저장된 식단\n\n${list}\n\n번호를 입력하세요:`);
+  if (choice && savedPlans[parseInt(choice)-1]) {
+    loadSavedPlan(parseInt(choice)-1);
+  }
 }
 
 function selAge(el,age) {
@@ -529,6 +706,10 @@ async function generatePlan() {
   startLoading();
 
   const allergies = getAllergies();
+  // 형제 정보 반영
+  const siblingText = children.length > 1 
+    ? `형제 있음: 첫째(${children[0].age}), 둘째(${children[1].age}). 공통 식단에 형제별 조리 팁 추가.`
+    : '';
   const allergyText = allergies.length ? `알레르기 제외: ${allergies.join(', ')}` : '';
   const fridgeItems = document.getElementById('fridgeInput')?.value?.trim() || '';
   const fridgeText = fridgeItems ? `냉장고 재료(자연스럽게 2~3회 활용, 억지 조합 금지): ${fridgeItems}` : '';
@@ -543,7 +724,7 @@ async function generatePlan() {
   const holidayText = holidays.size > 0 
     ? `휴무일(${[...holidays].join(',')}):해당 요일은 점심/간식 포함 전체 끼니 생성 필요` 
     : '';
-  const baseCondition = `나이:${selectedAge} ${allergyText} ${nurseryText} ${holidayText} ${nurseryMealText} ${seasonText} ${fridgeText} tip은 10자이내`;
+  const baseCondition = `나이:${selectedAge} ${allergyText} ${nurseryText} ${siblingText} ${holidayText} ${nurseryMealText} ${seasonText} ${fridgeText} tip은 10자이내`;
 
   const makePrompt = (days) => `${selectedAge} 아이를 위한 전문 영양사. ${days} 식단을 JSON으로 만들어줘.
 
@@ -626,6 +807,7 @@ JSON만 출력(다른 텍스트 없이):
     document.getElementById('planBadge').style.display = 'inline';
     showTab('plan');
     showToast('🍱 일주일 식단표 완성!');
+    trackEvent('generate_plan', 'plan', selectedAge);
   } catch(err) {
     stopLoading();
     document.getElementById('loading').classList.remove('show');
@@ -695,7 +877,10 @@ function renderDayMeals(idx) {
     return `<div class="meal-card" id="mc-${idx}-${meal}">
       <div class="meal-header">
         <div class="meal-type"><div class="meal-type-dot ${MEAL_COLORS[meal]}"></div>${meal}</div>
-        <button class="meal-replace-btn" data-day="${idx}" data-meal="${meal}" onclick="replaceMeal(this)">↺ 교체</button>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <span id="fav-wrap-${idx}-${meal}"></span>
+          <button class="meal-replace-btn" data-day="${idx}" data-meal="${meal}" onclick="replaceMeal(this)">↺ 교체</button>
+        </div>
       </div>
       <div class="meal-body">
         <div class="meal-name">${m.name||''}</div>
@@ -709,6 +894,23 @@ function renderDayMeals(idx) {
       <div id="recipe-wrap-${idx}-${meal}"></div>
     </div>`;
   }).join('');
+
+  // 즐겨찾기 버튼 동적 생성
+  MEALS.forEach(meal => {
+    const wrap = document.getElementById('fav-wrap-' + idx + '-' + meal);
+    if (!wrap) return;
+    const m = day.meals[meal];
+    if (!m || m.name === 'nursery') return;
+    const favBtn = document.createElement('button');
+    favBtn.className = 'fav-btn' + (favorites[idx+'-'+meal] ? ' active' : '');
+    favBtn.id = 'fav-' + idx + '-' + meal;
+    favBtn.textContent = '⭐';
+    const mealName = m.name || '';
+    const mealType = meal;
+    const dayIdx2 = idx;
+    favBtn.onclick = function() { toggleFavorite(dayIdx2, mealType, mealName); };
+    wrap.appendChild(favBtn);
+  });
 
   // 레시피 버튼 JS로 추가 (template literal 밖에서)
   MEALS.forEach(function(meal) {

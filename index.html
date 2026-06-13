@@ -512,7 +512,11 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div style="padding-top:16px;">
     <div class="week-header">
       <div class="week-title" id="weekTitle">이번 주 식단표</div>
-      <button class="regen-btn" onclick="generatePlan()">↺ 다시 짜기</button>
+      <div style="display:flex;gap:6px;">
+        <button class="regen-btn" id="savePlanBtn" onclick="savePlan()" style="display:none;">💾 저장</button>
+        <button class="regen-btn" id="loadPlanBtn" onclick="loadPlan()">📅 불러오기</button>
+        <button class="regen-btn" onclick="generatePlan()">↺ 다시 짜기</button>
+      </div>
     </div>
     <div class="day-tabs" id="dayTabs"></div>
     <div id="leftoverAlert" style="display:none;"></div>
@@ -957,10 +961,13 @@ C) 면/죽/카레 + 부반찬1~2
 - 단백질: 고기/생선/달걀/두부 반드시 포함
 - 채소: 나물/볶음/무침 1~2가지 반드시 포함
 
-★ 다양성 규칙:
+★ 다양성 규칙 (절대 위반 금지):
 - 한식 3일 + 면/카레/이국요리 2일로 배분
-- 같은 재료 연속 2일 사용 금지
-- 같은 조리법 연속 금지 (구이 연속, 조림 연속 금지)
+- 같은 재료 연속 2일 사용 절대 금지
+- 같은 조리법 연속 절대 금지 (구이 연속, 조림 연속 금지)
+- 파스타/우동/라면/국수/소면 등 면류는 일주일에 최대 1회만 허용
+- 볶음밥/카레/덮밥 등도 연속 이틀 금지
+- ${days} 안에서 같은 메인 재료(예:닭고기, 돼지고기, 소고기) 연속 이틀 금지
 
 ★ 급식표 중복 방지 (최우선):
 - 급식표 메뉴와 동일 메뉴 절대 금지
@@ -979,18 +986,30 @@ JSON만 출력(다른 텍스트 없이):
 위 형식으로 ${days} 전부 채워줘.`
 
   try {
-    // 전반부(월~목)와 후반부(금~일) 나눠서 요청
-    const [text1, text2] = await Promise.all([
-      callAI(makePrompt('월,화,수')),
-      callAI(makePrompt('목,금')),
-    ]);
+    // 전반부(월~수) 먼저 생성
+    const text1 = await callAI(makePrompt('월,화,수'));
 
-    // 두 결과 합치기
-    let days1 = [], days2 = [];
+    // 전반부 파싱
+    let days1 = [];
     try {
       const d = typeof text1 === 'string' ? JSON.parse(text1) : text1;
       days1 = d.days || [];
     } catch(e) { console.error('전반부 파싱 오류', e); }
+
+    // 전반부 메뉴 목록 추출 (후반부에 전달해서 중복 방지)
+    const firstHalfMenus = days1
+      .flatMap(d => Object.values(d.meals).map(m => m.name))
+      .filter(n => n && n !== 'nursery');
+    const firstHalfMenuText = firstHalfMenus.length
+      ? `\n★ 전반부(월~수)에 이미 사용한 메뉴 — 절대 반복 금지: ${firstHalfMenus.join(', ')}`
+      : '';
+
+    // 후반부(목~금) 생성 — 전반부 메뉴 전달
+    const makePromptWithHistory = (days) => makePrompt(days) + firstHalfMenuText;
+    const text2 = await callAI(makePromptWithHistory('목,금'));
+
+    // 후반부 파싱
+    let days2 = [];
     try {
       const d = typeof text2 === 'string' ? JSON.parse(text2) : text2;
       days2 = d.days || [];
@@ -1015,12 +1034,43 @@ JSON만 출력(다른 텍스트 없이):
 
     if (!weekPlan.days.length) throw new Error('식단 생성에 실패했어요. 다시 시도해주세요.');
 
+    // ★ 면류 중복 체크: 일주일 전체에서 파스타/우동/라면/국수 2회 이상이면 경고
+    const NOODLE_KEYWORDS = ['파스타','우동','라면','국수','소면','스파게티','냉면','쌀국수','짜장','짬뽕','로제','크림파스타','토마토파스타'];
+    const noodleMeals = [];
+    weekPlan.days.forEach(d => {
+      Object.entries(d.meals).forEach(([mealType, m]) => {
+        if (m?.name && m.name !== 'nursery') {
+          const isNoodle = NOODLE_KEYWORDS.some(kw => m.name.includes(kw));
+          if (isNoodle) noodleMeals.push(`${d.day}요일 ${mealType}: ${m.name}`);
+        }
+      });
+    });
+    if (noodleMeals.length >= 2) {
+      // 두 번째 이후 면류를 볶음밥으로 교체
+      let noodleCount = 0;
+      weekPlan.days.forEach(d => {
+        Object.entries(d.meals).forEach(([mealType, m]) => {
+          if (m?.name && m.name !== 'nursery') {
+            const isNoodle = NOODLE_KEYWORDS.some(kw => m.name.includes(kw));
+            if (isNoodle) {
+              noodleCount++;
+              if (noodleCount >= 2) {
+                d.meals[mealType] = { name: '밥, 된장국, 제육볶음, 시금치나물', cuisine: '한식', time: '20분', tip: '균형 잡힌 한식', nutrition: ['단백질','채소','탄수화물'] };
+              }
+            }
+          }
+        });
+      });
+    }
+
     stopLoading();
     document.getElementById('loading').classList.remove('show');
     renderCalendar();
     renderNutrition();
     renderShopping();
     document.getElementById('planBadge').style.display = 'inline';
+    // 저장 버튼 표시
+    document.getElementById('savePlanBtn').style.display = 'inline';
     // 아이 이름 있으면 타이틀 개인화
     const currentChild = children[currentChildIdx] || children[0];
     const childName = currentChild?.name?.trim();
@@ -1213,30 +1263,46 @@ JSON만 출력:
 async function replaceMeal(btnEl) {
   const dayIdx = parseInt(btnEl.dataset.day);
   const mealType = btnEl.dataset.meal;
-  const card = document.getElementById(`mc-${dayIdx}-${meal}`);
-  if (!card) return;
+  const cardId = `mc-${dayIdx}-${mealType}`;
+  const card = document.getElementById(cardId);
+  if (!card) { showToast('교체할 카드를 찾을 수 없어요.'); return; }
+
   const btn = card.querySelector('.meal-replace-btn');
   if (btn) { btn.textContent = '...'; btn.disabled = true; }
   card.style.opacity = '0.5';
 
   const existingMeals = weekPlan.days
-    .flatMap(d=>Object.values(d.meals).map(m=>m.name))
-    .filter(n=>n&&n!=='nursery');
+    .flatMap(d => Object.values(d.meals).map(m => m.name))
+    .filter(n => n && n !== 'nursery');
+
+  // 면류 이미 있으면 면류 제외 지시
+  const NOODLE_KEYWORDS = ['파스타','우동','라면','국수','소면','스파게티','냉면','쌀국수','짜장','짬뽕'];
+  const hasNoodle = existingMeals.some(name =>
+    NOODLE_KEYWORDS.some(kw => name && name.includes(kw))
+  );
+  const noNoodleRule = hasNoodle ? '면류(파스타/우동/라면/국수/소면/스파게티 등) 절대 금지.' : '';
+
+  const currentChild = children[currentChildIdx] || children[0];
+  const ageForReplace = currentChild?.age || selectedAge;
+  const allergiesForReplace = (currentChild?.allergies || getAllergies()).join(',') || '없음';
 
   try {
     const text = await callAI(
-      `${selectedAge} 아이의 ${mealType} 메뉴를 1개 추천해주세요.
-테마: ${selectedTheme}. 알레르기: ${getAllergies().join(',')||'없음'}
-이미 있는 메뉴와 겹치지 않게: ${existingMeals.join(',')}
-JSON만 응답: {"name":"메뉴명","cuisine":"한식/양식 등","time":"조리시간","tip":"팁","nutrition":["영양소"]}`
+      `${ageForReplace} 아이의 ${mealType} 메뉴를 1개 추천해주세요.
+알레르기 제외: ${allergiesForReplace}
+아래 메뉴들과 절대 겹치지 않게 (같은 재료/같은 요리법도 금지): ${existingMeals.join(',')}
+${noNoodleRule}
+JSON만 응답(다른 텍스트 없이): {"name":"메뉴명","cuisine":"한식/양식 등","time":"조리시간","tip":"10자이내팁","nutrition":["영양소"]}`
     );
     const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const match = cleaned.match(/\{[\s\S]*\}/);
+    const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       weekPlan.days[dayIdx].meals[mealType] = JSON.parse(match[0]);
-      renderDayMeals(dayIdx);
+      renderDayMeals(dayIdx);  // dayIdx 직접 사용
       renderShopping();
       showToast('✅ 메뉴가 교체됐어요!');
+    } else {
+      throw new Error('응답 파싱 실패');
     }
   } catch(e) {
     showToast('교체 실패. 다시 시도해주세요.');
@@ -1343,9 +1409,30 @@ function toggleItem(el_or_item) {
   else checkedItems.delete(item);
 }
 
+// ━━━ 식단표 저장/불러오기 ━━━
+function savePlan() {
+  if (!weekPlan) { showToast('저장할 식단표가 없어요!'); return; }
+  localStorage.setItem('momsbapsang_weekplan', JSON.stringify(weekPlan));
+  showToast('✅ 이번 주 식단이 저장됐어요!');
+}
+
+function loadPlan() {
+  try {
+    const raw = localStorage.getItem('momsbapsang_weekplan');
+    if (!raw) { showToast('저장된 식단표가 없어요.'); return; }
+    weekPlan = JSON.parse(raw);
+    renderCalendar();
+    renderNutrition();
+    renderShopping();
+    showTab('plan');
+    showToast('📅 저장된 식단표를 불러왔어요!');
+  } catch(e) {
+    showToast('불러오기 실패. 다시 시도해주세요.');
+  }
+}
+
 function openCoupang() {
   if (!weekPlan?.shoppingList) { showToast('식단표를 먼저 생성해주세요!'); return; }
-  // 쿠팡 파트너스 제휴링크
   window.open('https://link.coupang.com/a/d8uLRmCsii', '_blank');
   showToast('쿠팡으로 이동해요! 구매 시 수수료가 발생할 수 있어요 🛍');
 }

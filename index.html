@@ -1188,15 +1188,22 @@ JSON만 출력(다른 텍스트 없이):
 위 형식으로 ${days} 전부 채워줘.`
 
   try {
-    // 전반부(월~수) 먼저 생성
-    const text1 = await callAI(makePrompt('월,화,수'));
+    // JSON 답이 깨지거나 요일이 빠져서 오면 다시 요청하는 도우미 (최대 3번)
+    const askJson = async (promptText, isValid) => {
+      for (let k = 0; k < 3; k++) {
+        const raw = await callAI(promptText);
+        try {
+          const d = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (isValid(d)) return d;
+        } catch (e) { console.error('JSON 파싱 오류', e); }
+      }
+      return null;
+    };
 
-    // 전반부 파싱
-    let days1 = [];
-    try {
-      const d = typeof text1 === 'string' ? JSON.parse(text1) : text1;
-      days1 = d.days || [];
-    } catch(e) { console.error('전반부 파싱 오류', e); }
+    // 전반부(월~수) 먼저 생성
+    const d1 = await askJson(makePrompt('월,화,수'), d => (d.days || []).length >= 3);
+    if (!d1) throw new Error('식단을 만들지 못했어요. 잠시 후 다시 시도해주세요.');
+    const days1 = d1.days.slice(0, 3);
 
     // 전반부 메뉴 목록 추출 (후반부에 전달해서 중복 방지)
     const firstHalfMenus = days1
@@ -1208,25 +1215,16 @@ JSON만 출력(다른 텍스트 없이):
 
     // 후반부(목~금) 생성 — 전반부 메뉴 전달
     const makePromptWithHistory = (days) => makePrompt(days) + firstHalfMenuText;
-    const text2 = await callAI(makePromptWithHistory('목,금'));
+    const d2 = await askJson(makePromptWithHistory('목,금'), d => (d.days || []).length >= 2);
+    if (!d2) throw new Error('목·금 식단을 만들지 못했어요. 잠시 후 다시 시도해주세요.');
+    const days2 = d2.days.slice(0, 2);
 
-    // 후반부 파싱
-    let days2 = [];
-    try {
-      const d = typeof text2 === 'string' ? JSON.parse(text2) : text2;
-      days2 = d.days || [];
-    } catch(e) { console.error('후반부 파싱 오류', e); }
-
-    // 쇼핑리스트는 별도 요청
-    const shoppingText = await callAI(`${selectedAge} 아이 일주일 식단 재료 장보기 리스트 JSON만 출력:
-{"shoppingList":{"채소·과일":[{"item":"당근","amount":"2개","days":["월"]}],"단백질":[{"item":"닭가슴살","amount":"300g","days":["월"]}],"유제품·달걀":[{"item":"달걀","amount":"6개","days":["월"]}],"곡물·탄수화물":[{"item":"식빵","amount":"1봉","days":["월"]}]},"nutrition":{"단백질":{"pct":85,"tip":""},"채소":{"pct":70,"tip":""},"칼슘":{"pct":60,"tip":""},"철분":{"pct":78,"tip":""},"탄수화물":{"pct":90,"tip":""}}}
-나이:${selectedAge} ${allergyText}. 실제 재료 10~15가지로 채워줘.`);
-
+    // 쇼핑리스트는 별도 요청 (실패해도 식단은 보여줘요)
     let shopping = { shoppingList: {}, nutrition: {} };
-    try {
-      const d = typeof shoppingText === 'string' ? JSON.parse(shoppingText) : shoppingText;
-      shopping = d;
-    } catch(e) { console.error('쇼핑 파싱 오류', e); }
+    const d3 = await askJson(`${selectedAge} 아이 일주일 식단 재료 장보기 리스트 JSON만 출력:
+{"shoppingList":{"채소·과일":[{"item":"당근","amount":"2개","days":["월"]}],"단백질":[{"item":"닭가슴살","amount":"300g","days":["월"]}],"유제품·달걀":[{"item":"달걀","amount":"6개","days":["월"]}],"곡물·탄수화물":[{"item":"식빵","amount":"1봉","days":["월"]}]},"nutrition":{"단백질":{"pct":85,"tip":""},"채소":{"pct":70,"tip":""},"칼슘":{"pct":60,"tip":""},"철분":{"pct":78,"tip":""},"탄수화물":{"pct":90,"tip":""}}}
+나이:${selectedAge} ${allergyText}. 실제 재료 10~15가지로 채워줘.`, d => d.shoppingList && Object.keys(d.shoppingList).length > 0);
+    if (d3) shopping = d3;
 
     weekPlan = {
       days: [...days1, ...days2],

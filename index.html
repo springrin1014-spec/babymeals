@@ -228,6 +228,11 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
 .child-name-input:focus{border-color:var(--peach-deep);}
 
 /* 베타 배너 */
+.member-card{background:var(--white,#fff);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:14px;}
+.member-title{font-size:14px;font-weight:700;color:var(--brown);}
+.member-sub{font-size:11px;color:var(--muted);margin-top:2px;margin-bottom:10px;}
+.kakao-ch-btn{width:100%;background:#FEE500;color:#191919;border:none;border-radius:10px;padding:10px 12px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Pretendard',sans-serif;}
+.kakao-ch-btn:active{transform:scale(0.98);}
 .beta-banner{background:linear-gradient(135deg,var(--peach-light,#FFF0E8),#FDE8D8);border:1px solid var(--peach);border-radius:14px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
 .beta-banner-text{font-size:12px;color:var(--brown);line-height:1.6;flex:1;}
 .beta-badge{background:var(--peach-deep);color:white;border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700;flex-shrink:0;}
@@ -371,6 +376,17 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div class="beta-banner">
     <div class="beta-banner-text">현재 베타 서비스 운영 중이에요.<br>불편한 점은 인스타 DM으로 알려주세요 😊</div>
     <div class="beta-badge">BETA</div>
+  </div>
+
+  <!-- 멤버 카드 + 카카오 채널 -->
+  <div class="member-card" id="memberCard">
+    <div class="member-top">
+      <div>
+        <div class="member-title" id="memberTitle">🌱 엄마의 밥상 베타 멤버</div>
+        <div class="member-sub" id="memberSub">함께 만들어가는 1기 멤버예요</div>
+      </div>
+    </div>
+    <button class="kakao-ch-btn" onclick="openKakaoChannel()">💬 채널 추가하고 매주 식단 소식 받기</button>
   </div>
 
   <!-- 아이 탭 (첫째/둘째) -->
@@ -1640,6 +1656,32 @@ function openKurly() {
   const firstItem = Object.values(weekPlan.shoppingList).flat()[0]?.item || '유기농채소';
   window.open(`https://www.kurly.com/search?sword=${encodeURIComponent(firstItem)}`, '_blank');
 }
+
+// ━━━ 멤버 카드 / 카카오톡 채널 ━━━
+// 카카오톡 채널을 만든 뒤 주소(예: https://pf.kakao.com/_xxxxx)를 여기에 넣으세요
+const KAKAO_CHANNEL_URL = '';
+function openKakaoChannel() {
+  if (!KAKAO_CHANNEL_URL) { showToast('카카오톡 채널을 준비 중이에요. 곧 열려요 💛'); return; }
+  window.open(KAKAO_CHANNEL_URL, '_blank');
+}
+function renderMemberCard() {
+  const t = document.getElementById('memberTitle');
+  const sub = document.getElementById('memberSub');
+  if (!t || !sub) return;
+  let first = null;
+  try {
+    first = localStorage.getItem('mb_first_visit');
+    if (!first) { first = String(Date.now()); localStorage.setItem('mb_first_visit', first); }
+  } catch (e) {}
+  const days = first ? Math.floor((Date.now() - Number(first)) / 86400000) + 1 : 1;
+  let name = '';
+  try { name = ((children[currentChildIdx]||children[0]||{}).name || document.getElementById('childNameInput')?.value || '').trim(); } catch (e) {}
+  t.textContent = name ? `🌱 ${name}이네 밥상 · 베타 멤버` : '🌱 엄마의 밥상 베타 멤버';
+  sub.textContent = `함께한 지 ${days}일째 · 1기 멤버예요 💛`;
+}
+renderMemberCard();
+document.addEventListener('input', e => { if (e.target && e.target.id === 'childNameInput') renderMemberCard(); });
+document.addEventListener('click', e => { if (e.target && e.target.closest && e.target.closest('.child-tab,.age-btn,.ob-btn')) setTimeout(renderMemberCard, 100); });
 </script>
 </body>
 </html>

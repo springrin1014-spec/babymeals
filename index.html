@@ -751,21 +751,39 @@ const currentMonth = new Date().getMonth() + 1;
 const seasonIngredients = SEASON_INGREDIENTS[currentMonth] || [];
 
 // ━━━ 핵심: Vercel 서버 통해 AI 호출 ━━━
+// AI가 일시적으로 혼잡해서 거절하면 자동으로 다시 시도해요 (최대 6번)
 async function callAI(prompt, imageBase64 = null, imageMimeType = null) {
   const body = { prompt };
   if (imageBase64) { body.imageBase64 = imageBase64; body.imageMimeType = imageMimeType; }
 
-  const res = await fetch('/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const MAX_TRIES = 6;
+  const FATAL = /credit|billing|API key|no longer available|permission|invalid/i; // 다시 해도 소용없는 오류
+  let lastMsg = '';
 
-  if (!res.ok) throw new Error(`서버 오류: ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  if (data.parsed) return JSON.stringify(data.parsed);
-  return data.text;
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) {}
+
+      if (res.ok && data && !data.error) {
+        if (data.parsed) return JSON.stringify(data.parsed);
+        return data.text;
+      }
+      lastMsg = (data && data.error) || `서버 오류: ${res.status}`;
+      if (FATAL.test(lastMsg)) throw new Error(lastMsg);
+    } catch (e) {
+      if (FATAL.test(String(e.message))) throw e;
+      lastMsg = String(e.message || e);
+    }
+    // 잠깐 기다렸다가 다시 시도 (1.5초, 3초, 4.5초 ...)
+    await new Promise(s => setTimeout(s, 1500 * (attempt + 1)));
+  }
+  throw new Error('지금 AI가 많이 바빠요. 잠시 후 다시 시도해주세요.');
 }
 
 // ━━━ UI 헬퍼 ━━━

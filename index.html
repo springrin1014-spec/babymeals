@@ -348,7 +348,7 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
   <div class="ob-slide" id="ob2">
     <span class="ob-emoji">🛒</span>
     <div class="ob-title">장보기 리스트도<br><span>자동</span>으로!</div>
-    <div class="ob-desc">식단이 완성되면 장보기 목록이 자동으로 만들어져요.<br>쿠팡 연결로 바로 주문까지 가능해요.<br><br>지금 바로 시작해볼까요? 😊</div>
+    <div class="ob-desc">식단이 완성되면 장보기 목록이 자동으로 만들어져요.<br>쿠팡으로 바로 장보러 갈 수 있어요.<br><br>지금 바로 시작해볼까요? 😊</div>
     <button class="ob-next-btn" onclick="obSkip()">시작하기 🎉</button>
   </div>
 </div>
@@ -541,7 +541,7 @@ body{background:var(--cream);font-family:'Pretendard',sans-serif;color:var(--tex
     <div class="shopping-header">
       <div class="shopping-title">🛒 장보기 리스트</div>
     </div>
-    <button class="coupang-full-btn" onclick="openCoupang()">🛍 쿠팡에서 한번에 장보기</button>
+    <button class="coupang-full-btn" onclick="openCoupang()">🛍 쿠팡에서 장보기</button>
     <div id="shoppingContent">
       <div class="empty-state"><span class="empty-state-emoji">🛒</span><p>식단표를 먼저 생성해주세요!</p></div>
     </div>
@@ -1221,9 +1221,13 @@ JSON만 출력(다른 텍스트 없이):
 
     // 쇼핑리스트는 별도 요청 (실패해도 식단은 보여줘요)
     let shopping = { shoppingList: {}, nutrition: {} };
-    const d3 = await askJson(`${selectedAge} 아이 일주일 식단 재료 장보기 리스트 JSON만 출력:
-{"shoppingList":{"채소·과일":[{"item":"당근","amount":"2개","days":["월"]}],"단백질":[{"item":"닭가슴살","amount":"300g","days":["월"]}],"유제품·달걀":[{"item":"달걀","amount":"6개","days":["월"]}],"곡물·탄수화물":[{"item":"식빵","amount":"1봉","days":["월"]}]},"nutrition":{"단백질":{"pct":85,"tip":""},"채소":{"pct":70,"tip":""},"칼슘":{"pct":60,"tip":""},"철분":{"pct":78,"tip":""},"탄수화물":{"pct":90,"tip":""}}}
-나이:${selectedAge} ${allergyText}. 실제 재료 10~15가지로 채워줘.`, d => d.shoppingList && Object.keys(d.shoppingList).length > 0);
+    const allMenuNames = [...days1, ...days2]
+      .flatMap(d => Object.values(d.meals || {}).map(m => m && m.name))
+      .filter(n => n && n !== 'nursery');
+    const d3 = await askJson(`아래는 ${selectedAge} 아이의 이번 주 식단이야: ${allMenuNames.join(', ')}
+이 메뉴들에 실제로 필요한 재료로 장보기 리스트와 영양 점수를 JSON만 출력해줘:
+{"shoppingList":{"채소·과일":[{"item":"당근","amount":"2개","days":["월"]}],"단백질":[{"item":"닭가슴살","amount":"300g","days":["월"]}],"유제품·달걀":[{"item":"달걀","amount":"6개","days":["월"]}],"곡물·탄수화물":[{"item":"식빵","amount":"1봉","days":["월"]}]},"nutrition":{"단백질":{"pct":0,"tip":""},"채소":{"pct":0,"tip":""},"칼슘":{"pct":0,"tip":""},"철분":{"pct":0,"tip":""},"탄수화물":{"pct":0,"tip":""}}}
+규칙: 재료 10~15가지. pct는 위 메뉴를 보고 0~100으로 추정. tip은 모든 영양소에 한 문장씩, 이번 주 메뉴에 이어 쉽게 더할 수 있는 구체적인 음식 제안(예: "간식으로 치즈 한 장 더해보세요"). 나이:${selectedAge} ${allergyText}`, d => d.shoppingList && Object.keys(d.shoppingList).length > 0);
     if (d3) shopping = d3;
 
     weekPlan = {
@@ -1515,45 +1519,39 @@ JSON만 응답(다른 텍스트 없이): {"name":"메뉴명","cuisine":"한식/�
 function renderNutrition() {
   if (!weekPlan?.nutrition) return;
   const n = weekPlan.nutrition;
-  const getColor = pct => pct>=80?'fill-good':pct>=55?'fill-warn':'fill-bad';
-  const getLabel = pct => pct>=80?`✅ ${pct}%`:`⚠️ ${pct}%`;
-  const getTextColor = pct => pct>=80?'var(--green)':pct>=55?'var(--yellow)':'var(--red)';
+  const FALLBACK = {
+    '단백질':'달걀·두부·생선을 간식이나 반찬으로 한 번 더 더해보세요',
+    '채소':'국이나 볶음밥에 잘게 다진 채소를 살짝 섞어보세요',
+    '칼슘':'간식으로 치즈나 요거트 한 번 더 챙겨보세요',
+    '철분':'소고기나 시금치를 한 끼 더 넣어보세요',
+    '탄수화물':'밥·고구마·감자로 든든하게 채워보세요'
+  };
+  const rows = Object.entries(n).map(([name,data])=>{
+    const ok = (data.pct||0) >= 70;
+    const tip = (data.tip||'').trim() || FALLBACK[name] || '다양한 식재료로 균형을 맞춰보세요';
+    return `
+      <div class="nutrient-row" style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--warm);">
+        <div style="font-size:18px;line-height:1.2;">${ok?'🌱':'🌼'}</div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="nutrient-name">${name}</span>
+            <span style="font-size:12px;font-weight:700;color:${ok?'var(--green)':'var(--muted)'};">${ok?'충분해요':'한 끗 보완해봐요'}</span>
+          </div>
+          ${ok?'':`<div class="nutrient-tip">💡 ${tip}</div>`}
+        </div>
+      </div>`;
+  }).join('');
 
   document.getElementById('nutritionContent').innerHTML = `
     <div class="nutrition-card">
-      <div class="nutrition-title">📊 이번 주 영양 균형</div>
-      ${Object.entries(n).map(([nutrient,data])=>`
-        <div class="nutrient-row">
-          <div class="nutrient-label">
-            <span class="nutrient-name">${nutrient}</span>
-            <span class="nutrient-pct" style="color:${getTextColor(data.pct)}">${getLabel(data.pct)}</span>
-          </div>
-          <div class="nutrient-bar">
-            <div class="nutrient-fill ${getColor(data.pct)}" style="width:0%" data-target="${data.pct}"></div>
-          </div>
-          ${data.tip?`<div class="nutrient-tip">💡 ${data.tip}</div>`:''}
-        </div>`).join('')}
+      <div class="nutrition-title">🥗 이번 주 영양 포인트</div>
+      ${rows}
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;">※ AI가 이번 주 메뉴를 보고 추정한 참고용 정보예요. 아이의 상태에 따라 다를 수 있어요.</div>
     </div>
     ${seasonIngredients.length?`
     <div class="season-badge">
       🌿 <strong>${currentMonth}월 제철</strong>: ${seasonIngredients.join(', ')} 반영했어요!
-    </div>`:''}
-    <div class="nutrition-card">
-      <div class="nutrition-title">💡 다음 주를 위한 조언</div>
-      ${Object.entries(n).filter(([,d])=>d.pct<70).map(([nutrient,data])=>`
-        <div style="padding:8px 0;border-bottom:1px solid var(--warm);font-size:13px;">
-          <strong>${nutrient}</strong> 보충이 필요해요.<br>
-          <span style="color:var(--muted);font-size:12px;">${data.tip||'다양한 식재료로 균형을 맞춰보세요'}</span>
-        </div>`).join('') ||
-      '<div style="font-size:13px;color:var(--green);">🎉 이번 주 영양 균형이 훌륭해요!</div>'}
-    </div>`;
-
-  // 애니메이션
-  setTimeout(()=>{
-    document.querySelectorAll('.nutrient-fill').forEach(bar=>{
-      bar.style.width = bar.dataset.target + '%';
-    });
-  },200);
+    </div>`:''}`;
 }
 
 // ━━━ 장보기 리스트 ━━━
